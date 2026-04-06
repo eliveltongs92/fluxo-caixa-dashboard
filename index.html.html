@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Fluxo de Caixa</title>
+<style>
+  :root {
+    --azul: #4472C4;
+    --vermelho: #C00000;
+    --verde: #1D9E75;
+    --bg: #f5f5f5;
+    --bg-card: #ffffff;
+    --bg-sec: #f0f2f5;
+    --texto: #1a1a1a;
+    --texto-sec: #6b7280;
+    --borda: rgba(0,0,0,0.1);
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--texto); min-height: 100vh; }
+
+  /* HEADER */
+  .header { background: var(--azul); color: #fff; padding: 16px 16px 12px; position: sticky; top: 0; z-index: 100; }
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .header-title { font-size: 18px; font-weight: 600; }
+  .header-sub { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+  .header-mes { font-size: 13px; font-weight: 500; opacity: 0.9; background: rgba(255,255,255,0.15); padding: 3px 10px; border-radius: 20px; }
+
+  /* TABS */
+  .tabs { display: flex; background: #fff; border-bottom: 1px solid var(--borda); position: sticky; top: 68px; z-index: 99; }
+  .tab { flex: 1; padding: 12px 4px; font-size: 12px; font-weight: 500; text-align: center; color: var(--texto-sec); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab.ativo { color: var(--azul); border-bottom-color: var(--azul); }
+
+  /* PAINÉIS */
+  .painel { padding: 12px 12px 80px; display: none; }
+  .painel.ativo { display: block; }
+
+  /* CARDS */
+  .card { background: var(--bg-card); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+  .card-label { font-size: 11px; color: var(--texto-sec); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .card-valor { font-size: 26px; font-weight: 600; }
+  .pos { color: var(--verde); }
+  .neg { color: var(--vermelho); }
+  .azul { color: var(--azul); }
+
+  .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .mini-card { background: var(--bg-card); border-radius: var(--radius-sm); padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+  .mini-label { font-size: 11px; color: var(--texto-sec); margin-bottom: 4px; }
+  .mini-valor { font-size: 15px; font-weight: 600; }
+
+  /* BARRAS */
+  .grafico-titulo { font-size: 12px; color: var(--texto-sec); margin-bottom: 10px; }
+  .barra-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+  .barra-nome { font-size: 11px; color: var(--texto-sec); width: 105px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barra-outer { flex: 1; height: 22px; background: var(--bg-sec); border-radius: 4px; overflow: hidden; }
+  .barra-inner { height: 100%; background: var(--vermelho); border-radius: 4px; display: flex; align-items: center; padding: 0 6px; min-width: 6px; transition: width 0.5s ease; }
+  .barra-inner span { font-size: 10px; color: #fff; white-space: nowrap; overflow: hidden; }
+
+  /* NAVEGAÇÃO DE DIAS */
+  .nav-dias { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .nav-arrow { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--borda); background: var(--bg-card); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; font-size: 16px; color: var(--texto); box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+  .dias-scroll { display: flex; gap: 6px; overflow-x: auto; flex: 1; padding: 4px 0; scrollbar-width: none; }
+  .dias-scroll::-webkit-scrollbar { display: none; }
+  .dia-pill { flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--borda); background: var(--bg-card); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: var(--texto); transition: all 0.1s; }
+  .dia-pill.tem-dados { border-color: var(--azul); color: var(--azul); }
+  .dia-pill.ativo { background: var(--azul); border-color: var(--azul); color: #fff; }
+  .dia-pill.atr { border-color: var(--vermelho); color: var(--vermelho); font-size: 10px; font-weight: 600; }
+  .dia-pill.atr.ativo { background: var(--vermelho); border-color: var(--vermelho); color: #fff; }
+
+  /* SEÇÕES EXPANSÍVEIS */
+  .secao-card { background: var(--bg-card); border-radius: var(--radius); margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); overflow: hidden; }
+  .secao-header { display: flex; justify-content: space-between; align-items: center; padding: 13px 14px; cursor: pointer; user-select: none; }
+  .secao-header:active { background: var(--bg-sec); }
+  .secao-nome { font-size: 13px; font-weight: 600; color: var(--texto); flex: 1; padding-right: 8px; line-height: 1.3; }
+  .secao-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .secao-total { font-size: 13px; font-weight: 600; color: var(--vermelho); }
+  .secao-chevron { font-size: 14px; color: var(--texto-sec); transition: transform 0.2s; display: inline-block; }
+  .secao-chevron.open { transform: rotate(90deg); }
+  .secao-body { border-top: 1px solid var(--borda); display: none; }
+  .secao-body.open { display: block; }
+  .subdia-label { padding: 7px 14px 3px; font-size: 11px; color: var(--texto-sec); font-weight: 600; border-bottom: 1px solid var(--borda); background: var(--bg-sec); }
+  .fornec-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 14px; border-bottom: 1px solid var(--borda); }
+  .fornec-row:last-child { border-bottom: none; }
+  .fornec-nome { font-size: 12px; color: var(--texto); flex: 1; padding-right: 10px; line-height: 1.4; }
+  .fornec-valor { font-size: 12px; font-weight: 600; color: var(--texto-sec); white-space: nowrap; }
+
+  /* BADGE ATRASO */
+  .badge-atr { display: inline-block; background: #FCEBEB; color: #A32D2D; font-size: 10px; padding: 2px 7px; border-radius: 10px; margin-left: 6px; vertical-align: middle; font-weight: 500; }
+
+  /* EMPTY */
+  .empty { text-align: center; padding: 32px 16px; color: var(--texto-sec); font-size: 13px; }
+
+  /* UPLOAD SCREEN */
+  #tela-upload { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; background: var(--bg); }
+  .logo-area { text-align: center; margin-bottom: 32px; }
+  .logo-icon { width: 64px; height: 64px; background: var(--azul); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px; }
+  .logo-icon svg { width: 34px; height: 34px; fill: none; stroke: #fff; stroke-width: 2; }
+  .logo-titulo { font-size: 22px; font-weight: 700; color: var(--texto); }
+  .logo-sub { font-size: 13px; color: var(--texto-sec); margin-top: 4px; }
+  .upload-area { width: 100%; max-width: 360px; border: 2px dashed var(--azul); border-radius: var(--radius); padding: 32px 20px; text-align: center; background: rgba(68,114,196,0.04); cursor: pointer; }
+  .upload-area input { display: none; }
+  .upload-area p { font-size: 14px; color: var(--azul); font-weight: 500; margin-bottom: 6px; }
+  .upload-area span { font-size: 12px; color: var(--texto-sec); }
+  .upload-btn { display: inline-block; margin-top: 16px; background: var(--azul); color: #fff; border: none; border-radius: var(--radius-sm); padding: 12px 28px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; max-width: 360px; }
+  .upload-dica { margin-top: 16px; font-size: 12px; color: var(--texto-sec); text-align: center; max-width: 320px; line-height: 1.6; }
+
+  /* LOADING */
+  #tela-loading { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+  .spinner { width: 40px; height: 40px; border: 3px solid var(--borda); border-top-color: var(--azul); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* TROCAR ARQUIVO */
+  .btn-trocar { background: rgba(255,255,255,0.2); border: none; color: #fff; font-size: 12px; padding: 4px 10px; border-radius: 20px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- TELA DE UPLOAD -->
+<div id="tela-upload">
+  <div class="logo-area">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M3 3h18v18H3z" stroke-width="0"/><polyline points="3 9 12 2 21 9"/><path d="M9 22V12h6v10"/></svg>
+    </div>
+    <div class="logo-titulo">Fluxo de Caixa</div>
+    <div class="logo-sub">Dashboard — A realizar</div>
+  </div>
+  <label class="upload-area" id="upload-label">
+    <input type="file" id="file-input" accept=".xlsx,.xls">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#4472C4" stroke-width="1.5" style="margin-bottom:12px;">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+      <polyline points="17 8 12 3 7 8"/>
+      <line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
+    <p>Selecionar planilha</p>
+    <span>Fluxo_Caixa_YYYY_MM.xlsx</span>
+  </label>
+  <div class="upload-dica">
+    Abra o arquivo salvo na pasta<br>
+    <strong>Google Drive → Fluxo de Caixa</strong><br>
+    pelo app Google Drive no celular ou via Files.
+  </div>
+</div>
+
+<!-- TELA DE LOADING -->
+<div id="tela-loading">
+  <div class="spinner"></div>
+  <div style="font-size:14px;color:var(--texto-sec);">Carregando planilha...</div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="tela-dashboard" style="display:none;">
+  <div class="header">
+    <div class="header-top">
+      <div>
+        <div class="header-title">Fluxo de Caixa</div>
+        <div class="header-sub">A realizar</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <div class="header-mes" id="header-mes">—</div>
+        <button class="btn-trocar" onclick="voltarUpload()">Trocar arquivo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab ativo" onclick="setTab('visao')" id="tab-visao">Visão geral</button>
+    <button class="tab" onclick="setTab('dia')" id="tab-dia">Por dia</button>
+    <button class="tab" onclick="setTab('secao')" id="tab-secao">Por seção</button>
+  </div>
+
+  <!-- VISÃO GERAL -->
+  <div class="painel ativo" id="painel-visao">
+    <div class="card">
+      <div class="card-label">Saldo líquido do período</div>
+      <div class="card-valor" id="saldo-liquido">—</div>
+    </div>
+    <div class="row-2">
+      <div class="mini-card">
+        <div class="mini-label">Entradas totais</div>
+        <div class="mini-valor pos" id="total-entradas">—</div>
+      </div>
+      <div class="mini-card">
+        <div class="mini-label">Saídas totais</div>
+        <div class="mini-valor neg" id="total-saidas">—</div>
+      </div>
+    </div>
+    <div class="card" id="card-atrasos" style="display:none;">
+      <div class="card-label" style="color:#A32D2D;">Total em atrasos</div>
+      <div class="card-valor neg" id="total-atrasos">—</div>
+    </div>
+    <div class="card">
+      <div class="grafico-titulo">Saídas por seção</div>
+      <div id="grafico-secoes"></div>
+    </div>
+  </div>
+
+  <!-- POR DIA -->
+  <div class="painel" id="painel-dia">
+    <div class="nav-dias">
+      <div class="nav-arrow" onclick="navDia(-1)">‹</div>
+      <div class="dias-scroll" id="dias-scroll"></div>
+      <div class="nav-arrow" onclick="navDia(1)">›</div>
+    </div>
+    <div class="row-2" style="margin-bottom:10px;">
+      <div class="mini-card">
+        <div class="mini-label">Saídas do dia</div>
+        <div class="mini-valor neg" id="dia-saidas">—</div>
+      </div>
+      <div class="mini-card">
+        <div class="mini-label">Nº de pagamentos</div>
+        <div class="mini-valor azul" id="dia-count">—</div>
+      </div>
+    </div>
+    <div id="dia-secoes"></div>
+  </div>
+
+  <!-- POR SEÇÃO -->
+  <div class="painel" id="painel-secao">
+    <div id="secoes-lista"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+let dados = null;
+let diaAtivo = null;
+
+/* ── PARSE DE NÚMERO ── */
+function parseNum(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  if (typeof v === 'number') return isNaN(v) ? 0 : v;
+  let s = String(v).trim().replace(/\s/g, '');
+  if (s === '-' || s === '') return 0;
+  const neg = s.startsWith('-') || (s.startsWith('(') && s.endsWith(')'));
+  s = s.replace(/[()]/g, '').replace(/^-/, '');
+  if (s.includes(',') && s.includes('.')) {
+    s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  } else if (s.includes(',')) {
+    const p = s.split(',');
+    s = (p.length === 2 && p[1].length <= 2) ? s.replace(',', '.') : s.replace(/,/g, '');
+  }
+  s = s.replace(/[^0-9.]/g, '');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : (neg ? -n : n);
+}
+
+/* ── FORMATAÇÃO ── */
+function fmt(v) {
+  if (v === null || v === undefined) return '—';
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+}
+
+/* ── SEÇÕES CONHECIDAS ── */
+const SECOES = ['DUPLICATAS A PAGAR','CHEQUES EMITIDOS','COMISSÕES','PREVISÕES','EMPRÉSTIMOS','CONSÓRCIOS','FOMENTOS','EFS','EF','JUROS PAGOS','PARCELAMENTOS','SAÍDA SÓCIOS','SAIDA SOCIOS'];
+const TOTAIS = ['SAÍDAS TOTAIS','SAIDAS TOTAIS','ENTRADAS TOTAIS','SALDO LÍQUIDO','SALDO LIQUIDO'];
+
+function norm(s) { return String(s).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(); }
+function ehSecao(n) { const u = norm(n); return SECOES.some(s => u.startsWith(norm(s))); }
+function ehTotal(n) { const u = norm(n); return TOTAIS.some(s => u.startsWith(norm(s))); }
+
+/* ── UPLOAD ── */
+document.getElementById('file-input').addEventListener('change', function(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  document.getElementById('tela-upload').style.display = 'none';
+  document.getElementById('tela-loading').style.display = 'flex';
+  const r = new FileReader();
+  r.onload = ev => { try { processarExcel(ev.target.result, f.name); } catch(err) { alert('Erro: ' + err.message); voltarUpload(); } };
+  r.readAsArrayBuffer(f);
+});
+
+function voltarUpload() {
+  dados = null;
+  document.getElementById('tela-dashboard').style.display = 'none';
+  document.getElementById('tela-loading').style.display = 'none';
+  document.getElementById('tela-upload').style.display = 'flex';
+  document.getElementById('file-input').value = '';
+}
+
+/* ── PROCESSAR EXCEL ── */
+function processarExcel(buffer, filename) {
+  const wb = XLSX.read(buffer, { type: 'arraybuffer', cellDates: true, raw: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, raw: true });
+
+  const res = { mes: extrairMes(filename, wb.SheetNames[0]), colunas: [], secoes: [], saldoLiquido: 0, totalEntradas: 0, totalSaidas: 0, totalAtrasos: 0, porDia: {}, colTotalGeral: -1 };
+  if (raw.length < 3) { alert('Planilha sem dados.'); voltarUpload(); return; }
+
+  const cab = raw[1] || [];
+  for (let c = 2; c < cab.length; c++) {
+    const v = cab[c]; if (v === null || v === undefined) continue;
+    const s = String(v).trim();
+    if (s === 'TOTAL PERÍODO' || s === 'TOTAL PERIODO') { res.colTotalPeriodo = c; continue; }
+    if (s === 'TOTAL GERAL') { res.colTotalGeral = c; continue; }
+    const n = parseInt(s);
+    if (!isNaN(n) && n >= 1 && n <= 31) res.colunas.push({ col: c, dia: n });
+  }
+
+  res.colunas.forEach(({ dia }) => { res.porDia[dia] = { saidas: {}, count: 0 }; });
+  const cTG = res.colTotalGeral;
+  let emSaidas = false, secaoAtual = null;
+
+  for (let r = 2; r < raw.length; r++) {
+    const row = raw[r];
+    if (!row || !row[0]) continue;
+    const nome = String(row[0]).trim();
+    const nU = norm(nome);
+
+    if (norm(nU).startsWith(norm('SAIDAS TOTAIS')) || nU.startsWith(norm('SAÍDAS TOTAIS'))) {
+      emSaidas = true;
+      if (cTG >= 0) res.totalSaidas = parseNum(row[cTG]);
+      res.totalAtrasos = parseNum(row[1]);
+      secaoAtual = null; continue;
+    }
+    if (nU.startsWith(norm('ENTRADAS TOTAIS'))) { if (cTG >= 0) res.totalEntradas = parseNum(row[cTG]); continue; }
+    if (nU.startsWith(norm('SALDO LIQUIDO')) || nU.startsWith(norm('SALDO LIQ'))) { if (cTG >= 0) res.saldoLiquido = parseNum(row[cTG]); continue; }
+    if (!emSaidas) continue;
+    if (ehTotal(nome)) { secaoAtual = null; continue; }
+    if (ehSecao(nome)) {
+      secaoAtual = { nome, total: cTG >= 0 ? parseNum(row[cTG]) : 0, atrasos: parseNum(row[1]), porDia: {} };
+      res.colunas.forEach(({ dia }) => { secaoAtual.porDia[dia] = []; });
+      res.secoes.push(secaoAtual);
+      continue;
+    }
+    if (secaoAtual) {
+      res.colunas.forEach(({ col, dia }) => {
+        const v = parseNum(row[col]);
+        if (v > 0) {
+          secaoAtual.porDia[dia].push({ nome, valor: v });
+          if (!res.porDia[dia].saidas[secaoAtual.nome]) res.porDia[dia].saidas[secaoAtual.nome] = [];
+          res.porDia[dia].saidas[secaoAtual.nome].push({ nome, valor: v });
+          res.porDia[dia].count++;
+        }
+      });
+    }
+  }
+
+  dados = res;
+  renderDashboard();
+}
+
+function extrairMes(fn, sn) {
+  const m = fn.match(/(\d{4})_(\d{2})/);
+  if (m) { const ms = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']; return ms[parseInt(m[2])-1] + ' / ' + m[1]; }
+  return sn;
+}
+
+/* ── RENDER DASHBOARD ── */
+function renderDashboard() {
+  const d = dados;
+  document.getElementById('tela-loading').style.display = 'none';
+  document.getElementById('tela-upload').style.display = 'none';
+  document.getElementById('tela-dashboard').style.display = 'block';
+  document.getElementById('header-mes').textContent = d.mes;
+
+  const sl = d.saldoLiquido;
+  const slEl = document.getElementById('saldo-liquido');
+  slEl.textContent = fmt(sl);
+  slEl.className = 'card-valor ' + (sl >= 0 ? 'pos' : 'neg');
+  document.getElementById('total-entradas').textContent = fmt(d.totalEntradas);
+  document.getElementById('total-saidas').textContent = fmt(d.totalSaidas);
+
+  if (d.totalAtrasos > 0) {
+    document.getElementById('card-atrasos').style.display = '';
+    document.getElementById('total-atrasos').textContent = fmt(d.totalAtrasos);
+  }
+
+  renderGrafico();
+  renderDias();
+  renderSecoesLista();
+
+  const primeiro = d.colunas.find(c => d.porDia[c.dia] && Object.keys(d.porDia[c.dia].saidas).length > 0);
+  diaAtivo = primeiro ? primeiro.dia : (d.colunas[0] ? d.colunas[0].dia : null);
+  renderDia();
+  setTab('visao');
+}
+
+function renderGrafico() {
+  const secoes = dados.secoes.filter(s => s.total > 0).sort((a, b) => b.total - a.total).slice(0, 8);
+  const max = secoes[0] ? secoes[0].total : 1;
+  let html = '';
+  secoes.forEach(s => {
+    const pct = Math.max(5, Math.round(s.total / max * 100));
+    html += `<div class="barra-row">
+      <div class="barra-nome" title="${s.nome}">${s.nome}</div>
+      <div class="barra-outer"><div class="barra-inner" style="width:${pct}%"><span>${fmt(s.total)}</span></div></div>
+    </div>`;
+  });
+  document.getElementById('grafico-secoes').innerHTML = html;
+}
+
+function renderDias() {
+  const d = dados;
+  let html = `<div class="dia-pill atr ${diaAtivo === 'atrasos' ? 'ativo' : ''}" onclick="setDia('atrasos')">ATR</div>`;
+  d.colunas.forEach(({ dia }) => {
+    const pd = d.porDia[dia];
+    const tem = pd && Object.keys(pd.saidas).length > 0;
+    const cls = diaAtivo === dia ? 'ativo' : (tem ? 'tem-dados' : '');
+    html += `<div class="dia-pill ${cls}" onclick="setDia(${dia})">${dia}</div>`;
+  });
+  document.getElementById('dias-scroll').innerHTML = html;
+  const ativo = document.querySelector('.dia-pill.ativo');
+  if (ativo) ativo.scrollIntoView({ inline: 'center', behavior: 'smooth' });
+}
+
+function setDia(dia) { diaAtivo = dia; renderDias(); renderDia(); }
+
+function navDia(dir) {
+  const d = dados;
+  if (diaAtivo === 'atrasos') { if (dir === 1 && d.colunas.length > 0) setDia(d.colunas[0].dia); return; }
+  const idx = d.colunas.findIndex(c => c.dia === diaAtivo);
+  const ni = idx + dir;
+  if (ni === -1) setDia('atrasos');
+  else if (ni >= 0 && ni < d.colunas.length) setDia(d.colunas[ni].dia);
+}
+
+function renderDia() {
+  const d = dados;
+  const cont = document.getElementById('dia-secoes');
+  if (diaAtivo === 'atrasos') {
+    document.getElementById('dia-saidas').textContent = fmt(d.totalAtrasos);
+    document.getElementById('dia-count').textContent = '—';
+    const com = d.secoes.filter(s => s.atrasos > 0);
+    cont.innerHTML = com.length === 0 ? '<div class="empty">Sem atrasos registrados</div>' :
+      com.map(s => `<div class="secao-card">
+        <div class="secao-header" onclick="toggle(this)">
+          <span class="secao-nome">${s.nome}</span>
+          <span class="secao-right"><span class="secao-total">${fmt(s.atrasos)}</span><span class="secao-chevron">›</span></span>
+        </div>
+        <div class="secao-body"><div class="empty" style="padding:10px 14px;text-align:left;font-size:12px;">Ver detalhe na aba Por seção</div></div>
+      </div>`).join('');
+    return;
+  }
+  const pd = d.porDia[diaAtivo];
+  const totalDia = pd ? Object.values(pd.saidas).flat().reduce((a, b) => a + b.valor, 0) : 0;
+  const countDia = pd ? pd.count : 0;
+  document.getElementById('dia-saidas').textContent = fmt(totalDia);
+  document.getElementById('dia-count').textContent = countDia || '0';
+  if (!pd || Object.keys(pd.saidas).length === 0) { cont.innerHTML = '<div class="empty">Sem pagamentos neste dia</div>'; return; }
+  cont.innerHTML = Object.entries(pd.saidas)
+    .sort((a, b) => b[1].reduce((s,i)=>s+i.valor,0) - a[1].reduce((s,i)=>s+i.valor,0))
+    .map(([secao, itens]) => {
+      const tot = itens.reduce((a,b)=>a+b.valor,0);
+      const rows = itens.sort((a,b)=>b.valor-a.valor).map(it =>
+        `<div class="fornec-row"><div class="fornec-nome">${it.nome}</div><div class="fornec-valor">${fmt(it.valor)}</div></div>`).join('');
+      return `<div class="secao-card">
+        <div class="secao-header" onclick="toggle(this)">
+          <span class="secao-nome">${secao}</span>
+          <span class="secao-right"><span class="secao-total">${fmt(tot)}</span><span class="secao-chevron">›</span></span>
+        </div>
+        <div class="secao-body">${rows}</div>
+      </div>`;
+    }).join('');
+}
+
+function renderSecoesLista() {
+  const d = dados;
+  document.getElementById('secoes-lista').innerHTML = d.secoes.filter(s => s.total > 0)
+    .map(s => {
+      const badge = s.atrasos > 0 ? `<span class="badge-atr">atrasos ${fmt(s.atrasos)}</span>` : '';
+      let diasHtml = '';
+      d.colunas.forEach(({ dia }) => {
+        const itens = s.porDia[dia];
+        if (itens && itens.length > 0) {
+          const tot = itens.reduce((a,b)=>a+b.valor,0);
+          diasHtml += `<div class="subdia-label">Dia ${dia} — ${fmt(tot)}</div>`;
+          diasHtml += itens.sort((a,b)=>b.valor-a.valor).map(it =>
+            `<div class="fornec-row"><div class="fornec-nome">${it.nome}</div><div class="fornec-valor">${fmt(it.valor)}</div></div>`).join('');
+        }
+      });
+      if (!diasHtml) diasHtml = `<div class="empty" style="padding:10px 14px;font-size:12px;">Apenas atrasos nesta seção</div>`;
+      return `<div class="secao-card">
+        <div class="secao-header" onclick="toggle(this)">
+          <span class="secao-nome">${s.nome}${badge}</span>
+          <span class="secao-right"><span class="secao-total">${fmt(s.total)}</span><span class="secao-chevron">›</span></span>
+        </div>
+        <div class="secao-body">${diasHtml}</div>
+      </div>`;
+    }).join('') || '<div class="empty">Nenhuma seção com dados</div>';
+}
+
+function toggle(header) {
+  const body = header.nextElementSibling;
+  const chev = header.querySelector('.secao-chevron');
+  const aberto = body.classList.contains('open');
+  body.classList.toggle('open', !aberto);
+  if (chev) chev.classList.toggle('open', !aberto);
+}
+
+function setTab(tab) {
+  ['visao','dia','secao'].forEach(t => {
+    document.getElementById('tab-' + t).className = 'tab' + (t === tab ? ' ativo' : '');
+    document.getElementById('painel-' + t).className = 'painel' + (t === tab ? ' ativo' : '');
+  });
+}
+</script>
+</body>
+</html>
